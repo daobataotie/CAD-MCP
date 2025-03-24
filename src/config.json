@@ -1,0 +1,15 @@
+{
+    "server": {
+        "name": "CAD MCP 服务器",
+        "version": "1.0.0"
+    },
+    "cad": {
+        "type": "AutoCAD",  
+        "startup_wait_time": 20,
+        "command_delay": 0.5
+    },
+    "output": {
+        "directory": "./output",
+        "default_filename": "cad_drawing.dwg"
+    }
+}
