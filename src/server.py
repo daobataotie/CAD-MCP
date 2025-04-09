@@ -312,22 +312,7 @@ class CADService:
         
         return result
     
-    def erase_entity(self, entity_id):
-        """删除实体"""
-        if not self.controller.is_running():
-            return False
-        
-        result = self.controller.erase_entity(entity_id)
-        if result:
-            # 从状态中移除实体
-            self.drawing_state["entities"] = [e for e in self.drawing_state["entities"] if e.get("id") != entity_id]
-            self.drawing_state["last_command"] = f"删除实体{entity_id}"
-            self.drawing_state["last_result"] = "成功"
-        else:
-            self.drawing_state["last_result"] = "失败"
-        
-        return result
-    
+
     def save_drawing(self, file_path):
         """保存图纸"""
         if not self.controller.is_running():
@@ -499,73 +484,6 @@ class CADService:
                     "message": f"图纸已保存到 {file_path}" if result else f"保存图纸到 {file_path} 失败"
                 }
 
-            # 后期再做
-            # elif command_type == "erase":
-            #     entity_id = parsed_command.get("entity_id")
-            #     result = self.erase_entity(entity_id)
-
-            #     return {
-            #         "success": result,
-            #         "message": f"实体 {entity_id} 已删除" if result else f"删除实体 {entity_id} 失败"
-            #     }
-
-            # elif command_type == "move":
-            #     entity_id = parsed_command.get("entity_id")
-            #     from_point = parsed_command.get("from_point")
-            #     to_point = parsed_command.get("to_point")
-            #     result = self.move_entity(entity_id, from_point, to_point)
-
-            #     return {
-            #         "success": result,
-            #         "message": f"实体 {entity_id} 已移动" if result else f"移动实体 {entity_id} 失败"
-            #     }
-
-            # elif command_type == "rotate":
-            #     entity_id = parsed_command.get("entity_id")
-            #     base_point = parsed_command.get("base_point")
-            #     rotation_angle = parsed_command.get("rotation_angle")
-            #     result = self.rotate_entity(entity_id, base_point, rotation_angle)
-
-            #     return {
-            #         "success": result,
-            #         "message": f"实体 {entity_id} 已旋转" if result else f"旋转实体 {entity_id} 失败"
-            #     }
-
-            # elif command_type == "scale":
-            #     entity_id = parsed_command.get("entity_id")
-            #     base_point = parsed_command.get("base_point")
-            #     scale_factor = parsed_command.get("scale_factor")
-            #     result = self.scale_entity(entity_id, base_point, scale_factor)
-
-            #     return {
-            #         "success": result,
-            #         "message": f"实体 {entity_id} 已缩放" if result else f"缩放实体 {entity_id} 失败"
-            #     }
-
-            # # 处理专业建筑命令
-            # elif command_type == "draw_wall":
-            #     start_point = parsed_command.get("start_point")
-            #     end_point = parsed_command.get("end_point")
-            #     width = parsed_command.get("width", 10.0)
-            #     result = self.controller.draw_wall(start_point, end_point, width)
-            #     return {
-            #         "success": result is not None,
-            #         "message": "墙体已绘制" if result else "绘制墙体失败",
-            #         "entity_id": result[0].Handle if result and len(result) > 0 else None
-            #     }
-
-            # # 处理电气符号
-            # elif command_type == "draw_electrical_symbol":
-            #     symbol_type = parsed_command.get("symbol_type")
-            #     insertion_point = parsed_command.get("insertion_point")
-            #     scale = parsed_command.get("scale", 1.0)
-            #     rotation = parsed_command.get("rotation", 0.0)
-            #     result = self.controller.draw_electrical_symbol(symbol_type, insertion_point, scale, rotation)
-            #     return {
-            #         "success": result is not None,
-            #         "message": f"{symbol_type}已绘制" if result else f"绘制{symbol_type}失败",
-            #         "entity_id": result.Handle if result else None
-            #     }
 
             # 处理图层操作
             elif command_type == "create_layer":
@@ -582,49 +500,6 @@ class CADService:
                 "success": False,
                 "message": f"处理命令时出错: {str(e)}"
             }
-
-    # 后期再做
-    # def move_entity(self, entity_id, from_point, to_point):
-    #     """移动实体"""
-    #     if not self.controller.is_running():
-    #         return False
-        
-    #     result = self.controller.move_entity(entity_id, from_point, to_point)
-    #     if result:
-    #         self.drawing_state["last_command"] = f"移动实体{entity_id}"
-    #         self.drawing_state["last_result"] = "成功"
-    #     else:
-    #         self.drawing_state["last_result"] = "失败"
-        
-    #     return result
-    
-    # def rotate_entity(self, entity_id, base_point, rotation_angle):
-    #     """旋转实体"""
-    #     if not self.controller.is_running():
-    #         return False
-        
-    #     result = self.controller.rotate_entity(entity_id, base_point, rotation_angle)
-    #     if result:
-    #         self.drawing_state["last_command"] = f"旋转实体{entity_id}"
-    #         self.drawing_state["last_result"] = "成功"
-    #     else:
-    #         self.drawing_state["last_result"] = "失败"
-        
-    #     return result
-    
-    # def scale_entity(self, entity_id, base_point, scale_factor):
-    #     """缩放实体"""
-    #     if not self.controller.is_running():
-    #         return False
-        
-    #     result = self.controller.scale_entity(entity_id, base_point, scale_factor)
-    #     if result:
-    #         self.drawing_state["last_command"] = f"缩放实体{entity_id}"
-    #         self.drawing_state["last_result"] = "成功"
-    #     else:
-    #         self.drawing_state["last_result"] = "失败"
-        
-    #     return result
 
 async def main():
     """主入口函数"""
@@ -863,18 +738,6 @@ async def main():
                 },
             ),
 
-            # types.Tool(
-            #     name="erase_entity",
-            #     description="删除指定的实体",
-            #     inputSchema={
-            #         "type": "object",
-            #         "properties": {
-            #             "entity_id": {"type": "string", "description": "实体ID"}
-            #         },
-            #         "required": ["entity_id"],
-            #     },
-            # ),
-
             types.Tool(
                 name="save_drawing",
                 description="保存当前图纸",
@@ -1056,15 +919,6 @@ async def main():
                 
                 result = cad_service.draw_hatch(points, pattern_name, scale, layer, color)
                 return [types.TextContent(type="text", text=str(result))]
-
-            # elif name == "erase_entity":
-            #     entity_id = arguments.get("entity_id")
-                
-            #     if not entity_id:
-            #         raise ValueError("缺少实体ID")
-                
-            #     result = cad_service.erase_entity(entity_id)
-            #     return [types.TextContent(type="text", text=str(result))]
 
             elif name == "save_drawing":
                 file_path = arguments.get("file_path")

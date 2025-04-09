@@ -68,22 +68,6 @@ class NLPProcessor:
             "文本": "text", "文字": "text",
             "标注": "dimension", "尺寸标注": "dimension",
             
-            # 建筑元素
-            "墙": "wall", "墙体": "wall",
-            "门": "door", "窗": "window",
-            "楼梯": "stair", "柱子": "column",
-            
-            # 电气元素
-            "插座": "outlet",
-            "开关": "switch",
-            "灯": "light", "灯具": "light",
-            "配电箱": "distribution_box",
-            
-            # 机械元素
-            "轴": "shaft",
-            "齿轮": "gear",
-            "轴承": "bearing",
-            "法兰": "flange"
         }
         
         # 动作关键词映射
@@ -102,16 +86,6 @@ class NLPProcessor:
             "创建图层": "create_layer",
             "切换图层": "change_layer"
         }
-        
-        # # 专业领域映射
-        # self.domain_keywords = {
-        #     "建筑": "architecture",
-        #     "电气": "electrical",
-        #     "机械": "mechanical",
-        #     "土木": "civil",
-        #     "管道": "piping",
-        #     "结构": "structural"
-        # }
     
       
     def extract_color_from_command(self, command: str) -> Optional[int]:
@@ -182,22 +156,8 @@ class NLPProcessor:
             return self._parse_draw_text(command)
         elif command_type == "draw_hatch":
             return self._parse_draw_hatch(command)
-        # elif command_type == "erase":
-        #     return self._parse_erase(command)
-        # elif command_type == "move":
-        #     return self._parse_move(command)
-        # elif command_type == "rotate":
-        #     return self._parse_rotate(command)
-        # elif command_type == "scale":
-        #     return self._parse_scale(command)
         elif command_type == "save":
             return self._parse_save(command)
-        elif command_type == "draw_wall":
-            return self._parse_draw_wall(command)
-        elif command_type == "create_layer":
-            return self._parse_create_layer(command)
-        # elif command_type == "draw_electrical_symbol":
-        #     return self._parse_draw_electrical_symbol(command)
         else:
             # 默认返回一个错误结果
             return {
@@ -208,34 +168,9 @@ class NLPProcessor:
     
     def _identify_command_type(self, command: str) -> str:
         """识别命令类型"""
-        # 首先检查专业领域
-        domain = None
-        for domain_keyword, domain_type in self.domain_keywords.items():
-            if domain_keyword in command:
-                domain = domain_type
-                break
-        
         # 检查操作类型
         for action, action_type in self.action_keywords.items():
             if action in command:
-                # 建筑领域特殊处理
-                # if domain == "architecture":
-                #     for shape, shape_type in self.shape_keywords.items():
-                #         if shape in command:
-                #             if shape_type == "wall":
-                #                 return "draw_wall"
-                #             elif shape_type == "door":
-                #                 return "draw_door"
-                #             elif shape_type == "window":
-                #                 return "draw_window"
-                
-                # # 电气领域特殊处理
-                # elif domain == "electrical":
-                #     for shape, shape_type in self.shape_keywords.items():
-                #         if shape in command:
-                #             if shape_type in ["outlet", "switch", "light"]:
-                #                 return f"draw_electrical_{shape_type}"
-                
                 # 基本形状处理
                 for shape, shape_type in self.shape_keywords.items():
                     if shape in command:
@@ -262,19 +197,6 @@ class NLPProcessor:
         # 检查是否是标注命令
         if "标注" in command:
             return "add_dimension"
-        
-        # # 检查其他通用命令
-        # if any(word in command for word in ["删除", "擦除", "移除"]):
-        #     return "erase"
-        
-        # if any(word in command for word in ["移动", "挪动"]):
-        #     return "move"
-        
-        # if "旋转" in command:
-        #     return "rotate"
-        
-        # if any(word in command for word in ["缩放", "放大", "缩小"]):
-        #     return "scale"
         
         if "保存" in command:
             return "save"
@@ -577,152 +499,8 @@ class NLPProcessor:
                 "message": "绘制填充需要至少3个点来定义边界"
             }
 
-    # def _parse_erase(self, command: str) -> Dict[str, Any]:
-    #     """解析删除命令"""
-    #     # 尝试提取实体ID
-    #     entity_id_pattern = r'(?:ID|编号|实体)[^\w]*?([a-fA-F0-9]+)'
-    #     entity_id_match = re.search(entity_id_pattern, command, re.IGNORECASE)
-        
-    #     if entity_id_match:
-    #         entity_id = entity_id_match.group(1)
-    #         return {
-    #             "type": "erase",
-    #             "entity_id": entity_id
-    #         }
-    #     else:
-    #         # 如果没有找到实体ID，返回错误
-    #         return {
-    #             "type": "error",
-    #             "message": "删除命令需要指定实体ID"
-    #         }
-    
-    # def _parse_move(self, command: str) -> Dict[str, Any]:
-    #     """解析移动命令"""
-    #     # 尝试提取实体ID
-    #     entity_id_pattern = r'(?:ID|编号|实体)[^\w]*?([a-fA-F0-9]+)'
-    #     entity_id_match = re.search(entity_id_pattern, command, re.IGNORECASE)
-        
-    #     # 尝试提取坐标
-    #     coordinates = self._extract_coordinates(command)
-        
-    #     if entity_id_match and len(coordinates) >= 2:
-    #         entity_id = entity_id_match.group(1)
-    #         from_point = coordinates[0]
-    #         to_point = coordinates[1]
-            
-    #         return {
-    #             "type": "move",
-    #             "entity_id": entity_id,
-    #             "from_point": from_point,
-    #             "to_point": to_point
-    #         }
-    #     else:
-    #         # 如果没有找到足够的信息，返回错误
-    #         return {
-    #             "type": "error",
-    #             "message": "移动命令需要指定实体ID和两个坐标点"
-    #         }
-    
-    # def _parse_rotate(self, command: str) -> Dict[str, Any]:
-    #     """解析旋转命令"""
-    #     # 尝试提取实体ID
-    #     entity_id_pattern = r'(?:ID|编号|实体)[^\w]*?([a-fA-F0-9]+)'
-    #     entity_id_match = re.search(entity_id_pattern, command, re.IGNORECASE)
-        
-    #     # 尝试提取坐标
-    #     coordinates = self._extract_coordinates(command)
-        
-    #     # 提取旋转角度
-    #     rotation = 0.0  # 默认角度
-    #     rotation_pattern = r'(?:旋转|角度|rotation)[^\d]*?(-?\d+\.?\d*)'
-    #     rotation_match = re.search(rotation_pattern, command, re.IGNORECASE)
-    #     if rotation_match:
-    #         rotation = float(rotation_match.group(1))
-        
-    #     if entity_id_match and len(coordinates) >= 1:
-    #         entity_id = entity_id_match.group(1)
-    #         base_point = coordinates[0]
-            
-    #         return {
-    #             "type": "rotate",
-    #             "entity_id": entity_id,
-    #             "base_point": base_point,
-    #             "rotation_angle": rotation
-    #         }
-    #     else:
-    #         # 如果没有找到足够的信息，返回错误
-    #         return {
-    #             "type": "error",
-    #             "message": "旋转命令需要指定实体ID、基点和旋转角度"
-    #         }
-    
-    # def _parse_scale(self, command: str) -> Dict[str, Any]:
-        """解析缩放命令"""
-        # 尝试提取实体ID
-        entity_id_pattern = r'(?:ID|编号|实体)[^\w]*?([a-fA-F0-9]+)'
-        entity_id_match = re.search(entity_id_pattern, command, re.IGNORECASE)
-        
-        # 尝试提取坐标
-        coordinates = self._extract_coordinates(command)
-        
-        # 提取缩放比例
-        scale_factor = 1.0  # 默认比例
-        scale_pattern = r'(?:比例|缩放|scale)[^\d]*?(-?\d+\.?\d*)'
-        scale_match = re.search(scale_pattern, command, re.IGNORECASE)
-        if scale_match:
-            scale_factor = float(scale_match.group(1))
-        elif "放大" in command:
-            scale_factor = 2.0
-        elif "缩小" in command:
-            scale_factor = 0.5
-        
-        if entity_id_match and len(coordinates) >= 1:
-            entity_id = entity_id_match.group(1)
-            base_point = coordinates[0]
-            
-            return {
-                "type": "scale",
-                "entity_id": entity_id,
-                "base_point": base_point,
-                "scale_factor": scale_factor
-            }
-        else:
-            # 如果没有找到足够的信息，返回错误
-            return {
-                "type": "error",
-                "message": "缩放命令需要指定实体ID、基点和缩放比例"
-            }
-    
+
     def _parse_save(self, command: str) -> Dict[str, Any]:
-        """解析绘制墙体命令"""
-        # 尝试提取坐标
-        coordinates = self._extract_coordinates(command)
-        
-        # 提取墙体宽度
-        width = 10.0  # 默认宽度
-        width_pattern = r'(?:宽度|宽|厚|厚度)[^\d]*?(\d+\.?\d*)'
-        width_match = re.search(width_pattern, command)
-        if width_match:
-            width = float(width_match.group(1))
-        
-        if len(coordinates) >= 2:
-            start_point = coordinates[0]
-            end_point = coordinates[1]
-            
-            return {
-                "type": "draw_wall",
-                "start_point": start_point,
-                "end_point": end_point,
-                "width": width
-            }
-        else:
-            # 没有足够的坐标信息，返回错误
-            return {
-                "type": "error",
-                "message": "绘制墙体需要提供起点和终点坐标"
-            }
-    
-    def _parse_create_layer(self, command: str) -> Dict[str, Any]:
         """解析保存命令"""
         # 尝试提取文件路径
         path_pattern = r'(?:路径|保存到|path)[^\w]*?[\"\'](.*?)[\"\']'
@@ -738,89 +516,3 @@ class NLPProcessor:
             "type": "save",
             "file_path": file_path
         }
-    
-    # def _parse_draw_wall(self, command: str) -> Dict[str, Any]:
-    #     """解析创建图层命令"""
-    #     # 尝试提取图层名称
-    #     layer_name_pattern = r'(?:名称|名字|叫)[^\w]*?[\"\'](.*?)[\"\']'
-    #     layer_name_match = re.search(layer_name_pattern, command)
-        
-    #     if not layer_name_match:
-    #         # 尝试另一种模式
-    #         layer_name_pattern = r'图层[^\w]*?[\"\'](.*?)[\"\']'
-    #         layer_name_match = re.search(layer_name_pattern, command)
-        
-    #     # 提取颜色
-    #     color = 7  # 默认白色
-    #     # 基本颜色映射（CAD颜色索引）
-    #     color_map = {
-    #         "红": 1, "红色": 1,
-    #         "黄": 2, "黄色": 2,
-    #         "绿": 3, "绿色": 3,
-    #         "青": 4, "青色": 4,
-    #         "蓝": 5, "蓝色": 5,
-    #         "洋红": 6, "洋红色": 6, "紫": 6, "紫色": 6,
-    #         "白": 7, "白色": 7,
-    #         "灰": 8, "灰色": 8
-    #     }
-        
-    #     for color_name, color_code in color_map.items():
-    #         if color_name in command:
-    #             color = color_code
-    #             break
-        
-    #     # 尝试提取RGB颜色值
-    #     rgb_color = self.extract_color_from_command(command)
-    #     if rgb_color is not None:
-    #         # 如果找到了RGB颜色值，优先使用它
-    #         color = rgb_color
-        
-    #     if layer_name_match:
-    #         layer_name = layer_name_match.group(1)
-    #         return {
-    #             "type": "create_layer",
-    #             "layer_name": layer_name,
-    #             "color": color
-    #         }
-    #     else:
-    #         # 如果没有找到图层名称，尝试使用默认名称
-    #         return {
-    #             "type": "create_layer",
-    #             "layer_name": "新图层",
-    #             "color": color,
-    #             "note": "使用默认图层名称，因为命令中未提供图层名称"
-    #         }
-    
-    # def _parse_draw_electrical_symbol(self, command: str) -> Dict[str, Any]:
-    #     """解析绘制电气符号命令"""
-    #     # 尝试提取坐标
-    #     coordinates = self._extract_coordinates(command)
-        
-    #     # 提取缩放比例
-    #     scale = 1.0  # 默认比例
-    #     scale_pattern = r'(?:比例|缩放|scale)[^\d]*?(\d+\.?\d*)'
-    #     scale_match = re.search(scale_pattern, command, re.IGNORECASE)
-    #     if scale_match:
-    #         scale = float(scale_match.group(1))
-        
-    #     # 提取旋转角度
-    #     rotation = 0.0  # 默认角度
-    #     rotation_pattern = r'(?:旋转|角度|rotation)[^\d]*?(-?\d+\.?\d*)'
-    #     rotation_match = re.search(rotation_pattern, command, re.IGNORECASE)
-    #     if rotation_match:
-    #         rotation = float(rotation_match.group(1))
-        
-    #     if len(coordinates) >= 1:
-    #         insertion_point = coordinates[0]
-            
-    #         return {
-    #             "type": "draw_electrical_symbol",
-    #             "insertion_point": insertion_point,
-    #             "scale": scale,
-    #             "rotation": rotation
-    #         }
-    #     else:
-    #         # 没有坐标信息，返回错误
-    #         return {
-    #             "type": "error",
-            # }

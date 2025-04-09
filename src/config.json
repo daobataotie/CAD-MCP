@@ -4,7 +4,7 @@
         "version": "1.0.0"
     },
     "cad": {
-        "type": "AutoCAD",  
+        "type": "gcad", 
         "startup_wait_time": 20,
         "command_delay": 0.5
     },

@@ -186,26 +186,33 @@ class CADController:
             # 保存文件
             self.doc.SaveAs(file_path)
             logger.info(f"图纸已保存到: {file_path}")
+
+            # # 创建临时脚本文件
+            # script_path = os.path.join(os.path.dirname(file_path), "save_script.scr")
+            # with open(script_path, "w") as f:
+            #     # 写入SAVEAS命令
+            #     abs_path = os.path.abspath(file_path)
+            #     f.write(f'SAVEAS\n"DWG"\n"{abs_path}"\n')
+            
+            # # 运行脚本
+            # logger.info(f"通过脚本文件保存图纸到: {file_path}")
+            # self.doc.SendCommand(f'_SCRIPT\n"{script_path}"\n')
+            
+            # # 等待脚本执行完成
+            # time.sleep(2)
+            
+            # # 删除临时脚本文件
+            # try:
+            #     os.remove(script_path)
+            # except:
+            #     pass
+            
+            # logger.info("图纸保存成功")
+            
             return True
         except Exception as e:
             logger.error(f"保存图纸失败: {str(e)}")
             return False
-    
-    # def clear_entities(self, shape_name: str) -> None:
-    #     """清除特定形状的所有实体"""
-    #     if shape_name in self.entities:
-    #         for entity in self.entities[shape_name]:
-    #             try:
-    #                 entity.Delete()
-    #             except:
-    #                 pass  # 实体可能已被删除
-    #         self.entities[shape_name] = []
-    
-    # def get_entity_group(self, shape_name: str) -> List:
-    #     """获取特定形状的实体组，如果不存在则创建"""
-    #     if shape_name not in self.entities:
-    #         self.entities[shape_name] = []
-    #     return self.entities[shape_name]
     
     def refresh_view(self) -> None:
         """刷新CAD视图"""
@@ -237,10 +244,10 @@ class CADController:
             return 0
     
     def draw_line(self, start_point: Tuple[float, float, float], 
-                 end_point: Tuple[float, float, float], layer: str = None, color: int = None, lineweight=None) -> Any:
+                 end_point: Tuple[float, float, float], layer: str = None, color: int = None, lineweight=None) -> bool:
         """绘制直线"""
         if not self.is_running():
-            return None
+            return False
             
         try:
             # 确保点是三维的
@@ -554,161 +561,6 @@ class CADController:
             logger.error(f"创建填充时出错: {str(e)}")
             return None
     
-    # def erase_entity(self, entity_id: str) -> bool:
-    #     """删除指定的实体"""
-    #     if not self.is_running():
-    #         return False
-            
-    #     try:
-    #         # 在实体字典中查找
-    #         for shape_name, entities in self.entities.items():
-    #             for i, entity in enumerate(entities):
-    #                 if hasattr(entity, 'Handle') and entity.Handle == entity_id:
-    #                     entity.Delete()
-    #                     entities.pop(i)
-    #                     logger.info(f"已删除实体: {entity_id}")
-                        
-    #                     # 刷新视图
-    #                     self.refresh_view()
-
-    #                     return True
-            
-    #         # 如果在字典中找不到，尝试在当前文档中查找
-    #         for obj in self.doc.ModelSpace:
-    #             if hasattr(obj, 'Handle') and obj.Handle == entity_id:
-    #                 obj.Delete()
-    #                 logger.info(f"已删除实体: {entity_id}")
-    #                 return True
-                                
-    #         logger.warning(f"未找到实体: {entity_id}")
-    #         return False
-    #     except Exception as e:
-    #         logger.error(f"删除实体时出错: {str(e)}")
-    #         return False
-    
-    # def move_entity(self, entity_id: str, 
-    #                from_point: Tuple[float, float, float], 
-    #                to_point: Tuple[float, float, float]) -> bool:
-    #     """移动指定的实体"""
-    #     if not self.is_running():
-    #         return False
-            
-    #     try:
-    #         # 确保点是三维的
-    #         if len(from_point) == 2:
-    #             from_point = (from_point[0], from_point[1], 0)
-    #         if len(to_point) == 2:
-    #             to_point = (to_point[0], to_point[1], 0)
-                
-    #         # 计算移动向量
-    #         displacement = (
-    #             to_point[0] - from_point[0],
-    #             to_point[1] - from_point[1],
-    #             to_point[2] - from_point[2]
-    #         )
-            
-    #         # 在实体字典中查找
-    #         for shape_name, entities in self.entities.items():
-    #             for entity in entities:
-    #                 if hasattr(entity, 'Handle') and entity.Handle == entity_id:
-    #                     entity.Move(from_point, to_point)
-    #                     logger.info(f"已移动实体: {entity_id}")
-                        
-    #                     # 刷新视图
-    #                     self.refresh_view()
-            
-    #                     return True
-            
-    #         # 如果在字典中找不到，尝试在当前文档中查找
-    #         for obj in self.doc.ModelSpace:
-    #             if hasattr(obj, 'Handle') and obj.Handle == entity_id:
-    #                 obj.Move(from_point, to_point)
-    #                 logger.info(f"已移动实体: {entity_id}")
-    #                 return True
-                    
-    #         logger.warning(f"未找到实体: {entity_id}")
-    #         return False
-    #     except Exception as e:
-    #         logger.error(f"移动实体时出错: {str(e)}")
-    #         return False
-    
-    # def rotate_entity(self, entity_id: str, 
-    #                  base_point: Tuple[float, float, float], 
-    #                  rotation_angle: float) -> bool:
-    #     """旋转指定的实体"""
-    #     if not self.is_running():
-    #         return False
-            
-    #     try:
-    #         # 确保点是三维的
-    #         if len(base_point) == 2:
-    #             base_point = (base_point[0], base_point[1], 0)
-                
-    #         # 将角度转换为弧度
-    #         angle_rad = math.radians(rotation_angle)
-            
-    #         # 在实体字典中查找
-    #         for shape_name, entities in self.entities.items():
-    #             for entity in entities:
-    #                 if hasattr(entity, 'Handle') and entity.Handle == entity_id:
-    #                     entity.Rotate(base_point, angle_rad)
-    #                     logger.info(f"已旋转实体: {entity_id}, 角度: {rotation_angle}度")
-
-    #                     # 刷新视图
-    #                     self.refresh_view()
-
-    #                     return True
-            
-    #         # 如果在字典中找不到，尝试在当前文档中查找
-    #         for obj in self.doc.ModelSpace:
-    #             if hasattr(obj, 'Handle') and obj.Handle == entity_id:
-    #                 obj.Rotate(base_point, angle_rad)
-    #                 logger.info(f"已旋转实体: {entity_id}, 角度: {rotation_angle}度")
-    #                 return True
-                    
-    #         logger.warning(f"未找到实体: {entity_id}")
-    #         return False
-    #     except Exception as e:
-    #         logger.error(f"旋转实体时出错: {str(e)}")
-    #         return False
-    
-    # def scale_entity(self, entity_id: str, 
-    #                 base_point: Tuple[float, float, float], 
-    #                 scale_factor: float) -> bool:
-    #     """缩放指定的实体"""
-    #     if not self.is_running():
-    #         return False
-            
-    #     try:
-    #         # 确保点是三维的
-    #         if len(base_point) == 2:
-    #             base_point = (base_point[0], base_point[1], 0)
-                
-    #         # 在实体字典中查找
-    #         for shape_name, entities in self.entities.items():
-    #             for entity in entities:
-    #                 if hasattr(entity, 'Handle') and entity.Handle == entity_id:
-    #                     entity.ScaleEntity(base_point, scale_factor)
-    #                     logger.info(f"已缩放实体: {entity_id}, 比例: {scale_factor}")
-
-    #                     # 刷新视图
-    #                     self.refresh_view()
-
-    #                     return True
-            
-    #         # 如果在字典中找不到，尝试在当前文档中查找
-    #         for obj in self.doc.ModelSpace:
-    #             if hasattr(obj, 'Handle') and obj.Handle == entity_id:
-    #                 obj.ScaleEntity(base_point, scale_factor)
-    #                 logger.info(f"已缩放实体: {entity_id}, 比例: {scale_factor}")
-    #                 return True
-                    
-    #         logger.warning(f"未找到实体: {entity_id}")
-    #         return False
-    #     except Exception as e:
-    #         logger.error(f"缩放实体时出错: {str(e)}")
-    #         return False
-    
     def zoom_extents(self) -> bool:
         """缩放视图以显示所有对象"""
         if not self.is_running():
@@ -895,250 +747,3 @@ class CADController:
                 logger.error(f"添加标注时出错: {str(e)}")
                 return None
 
-    
-    # def draw_wall(self, start_point: Tuple[float, float, float], 
-    #              end_point: Tuple[float, float, float], width: float = 10.0, layer: str = None, color: int = None) -> List[Any]:
-    #         """绘制墙体（用于建筑图）"""
-    #         if not self.is_running():
-    #             return None
-            
-    #         try:
-    #             # 确保点是三维的
-    #             if len(start_point) == 2:
-    #                 start_point = (start_point[0], start_point[1], 0)
-    #             if len(end_point) == 2:
-    #                 end_point = (end_point[0], end_point[1], 0)
-                
-    #             # 计算墙体的方向向量
-    #             dx = end_point[0] - start_point[0]
-    #             dy = end_point[1] - start_point[1]
-    #             length = math.sqrt(dx*dx + dy*dy)
-                
-    #             # 单位法向量
-    #             if length > 0:
-    #                 nx = -dy / length
-    #                 ny = dx / length
-    #             else:
-    #                 return None
-                
-    #             # 计算墙体四个角点
-    #             half_width = width / 2
-    #             p1 = (start_point[0] + nx * half_width, start_point[1] + ny * half_width, start_point[2])
-    #             p2 = (start_point[0] - nx * half_width, start_point[1] - ny * half_width, start_point[2])
-    #             p3 = (end_point[0] - nx * half_width, end_point[1] - ny * half_width, end_point[2])
-    #             p4 = (end_point[0] + nx * half_width, end_point[1] + ny * half_width, end_point[2])
-                
-    #             # 绘制封闭的多段线表示墙体
-    #             points = [p1, p2, p3, p4, p1]  # 闭合多段线
-    #             wall = self.draw_polyline(points, closed=True, layer=layer, color=color)
-    #             return wall
-    #         except Exception as e:
-    #             logger.error(f"绘制墙体时出错: {str(e)}")
-    #             return None
-
-    # def draw_electrical_symbol(self, symbol_type: str, insertion_point: Tuple[float, float, float],
-    #                          scale: float = 1.0, rotation: float = 0.0) -> Any:
-    #         """绘制电气符号"""
-    #         if not self.is_running():
-    #             return None
-            
-    #         try:
-    #             # 确保点是三维的
-    #             if len(insertion_point) == 2:
-    #                 insertion_point = (insertion_point[0], insertion_point[1], 0)
-                
-    #             # 根据符号类型创建不同的图形
-    #             if symbol_type.lower() == "outlet" or symbol_type.lower() == "插座":
-    #                 # 创建插座符号（圆圈）
-    #                 circle = self.draw_circle(insertion_point, 2 * scale)
-                    
-    #                 # 在圆内添加水平线
-    #                 p1 = (insertion_point[0] - 1.5 * scale, insertion_point[1], insertion_point[2])
-    #                 p2 = (insertion_point[0] + 1.5 * scale, insertion_point[1], insertion_point[2])
-    #                 line = self.draw_line(p1, p2)
-                    
-    #                 # 如果需要旋转
-    #                 if rotation != 0:
-    #                     self.rotate_entity(circle.Handle, insertion_point, rotation)
-    #                     self.rotate_entity(line.Handle, insertion_point, rotation)
-                        
-    #                 return circle  # 返回主要实体
-                    
-    #             elif symbol_type.lower() == "switch" or symbol_type.lower() == "开关":
-    #                 # 创建开关符号（正方形）
-    #                 size = 3 * scale
-    #                 p1 = (insertion_point[0] - size/2, insertion_point[1] - size/2, insertion_point[2])
-    #                 p2 = (insertion_point[0] + size/2, insertion_point[1] + size/2, insertion_point[2])
-    #                 square = self.draw_rectangle(p1, p2)
-                    
-    #                 # 如果需要旋转
-    #                 if rotation != 0:
-    #                     self.rotate_entity(square.Handle, insertion_point, rotation)
-                        
-    #                 return square
-                    
-    #             elif symbol_type.lower() == "light" or symbol_type.lower() == "灯":
-    #                 # 创建灯符号（带叉的圆）
-    #                 circle = self.draw_circle(insertion_point, 3 * scale)
-                    
-    #                 # 添加交叉线
-    #                 p1 = (insertion_point[0] - 2 * scale, insertion_point[1] - 2 * scale, insertion_point[2])
-    #                 p2 = (insertion_point[0] + 2 * scale, insertion_point[1] + 2 * scale, insertion_point[2])
-    #                 line1 = self.draw_line(p1, p2)
-                    
-    #                 p3 = (insertion_point[0] - 2 * scale, insertion_point[1] + 2 * scale, insertion_point[2])
-    #                 p4 = (insertion_point[0] + 2 * scale, insertion_point[1] - 2 * scale, insertion_point[2])
-    #                 line2 = self.draw_line(p3, p4)
-                    
-    #                 # 如果需要旋转
-    #                 if rotation != 0:
-    #                     self.rotate_entity(circle.Handle, insertion_point, rotation)
-    #                     self.rotate_entity(line1.Handle, insertion_point, rotation)
-    #                     self.rotate_entity(line2.Handle, insertion_point, rotation)
-                        
-    #                 return circle
-                    
-    #             else:
-    #                 logger.warning(f"未知的电气符号类型: {symbol_type}")
-    #                 return None
-    #         except Exception as e:
-    #             logger.error(f"绘制电气符号时出错: {str(e)}")
-    #             return None
-
-
-# 以下是发送命令的方式，暂时还没用到
-    def draw_circle_command(self, center: Tuple[float, float, float], 
-                           radius: float) -> bool:
-        """使用命令行方式绘制圆"""
-        if not self.is_running():
-            return False
-        
-        try:
-            # 格式化坐标和半径
-            x, y, z = center
-            
-            # 修改命令格式，增加更明确的坐标分隔
-            cmd = f"_CIRCLE {x},{y},{z} {radius}\n"
-            
-            # 日志记录
-            logger.info(f"发送命令: {cmd}")
-            
-            # 清除当前命令（防止干扰）
-            self.doc.SendCommand("\x03\x03")  # 发送ESC键
-            time.sleep(0.1)
-            
-            # 发送命令并等待执行
-            self.doc.SendCommand(cmd)
-            time.sleep(0.8)  # 增加等待时间
-            
-            # 刷新视图
-            self.refresh_view()
-            
-            logger.info("成功执行绘制圆命令")
-            return True
-            
-        except Exception as e:
-            logger.error(f"执行绘制圆命令失败: {str(e)}")
-            return False
-
-    def end_command(self):
-        """结束当前命令"""
-        try:
-            # 发送回车和ESC组合来确保命令结束
-            self.doc.SendCommand("\n\x03")
-            time.sleep(0.1)
-        except:
-            pass
-
-    def draw_line_command(self, start_point: Tuple[float, float, float],
-                         end_point: Tuple[float, float, float]) -> bool:
-        """使用命令行方式绘制直线"""
-        if not self.is_running():
-            return False
-        
-        try:
-            # 先结束任何可能正在进行的命令
-            self.end_command()
-            
-            # 格式化坐标
-            sx, sy, sz = start_point
-            ex, ey, ez = end_point
-            
-            # 修改命令格式，使用空格分隔坐标
-            cmd = f"_LINE {sx},{sy},{sz} {ex},{ey},{ez}\n\n"
-            
-            # 发送命令
-            logger.info(f"发送命令: {cmd}")
-            self.doc.SendCommand(cmd)
-            
-            # 等待命令执行完成
-            time.sleep(self.command_delay)
-            
-            # 确保命令结束
-            self.end_command()
-            
-            # 刷新视图
-            self.refresh_view()
-            
-            logger.info("成功执行绘制直线命令")
-            return True
-            
-        except Exception as e:
-            logger.error(f"执行绘制直线命令失败: {str(e)}")
-            return False
-
-    def save_drawing_command(self, file_path: str) -> bool:
-        """使用命令行方式保存图纸"""
-        if not self.is_running():
-            return False
-        
-        try:
-            # 确保目录存在
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            
-            # 方法1: 使用QSAVE命令 - 需要用户交互
-            logger.info("使用QSAVE命令保存图纸")
-            self.doc.SendCommand("_QSAVE\n")
-            
-            logger.info("QSAVE命令已发送，请在CAD界面中选择保存位置")
-            # 这里需要用户在CAD界面上操作
-            
-            return True
-        except Exception as e:
-            logger.error(f"保存图纸失败: {str(e)}")
-            return False
-
-    def save_drawing_script(self, file_path: str) -> bool:
-        """使用脚本文件方式保存图纸"""
-        if not self.is_running():
-            return False
-        
-        try:
-            # 确保目录存在
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            
-            # 创建临时脚本文件
-            script_path = os.path.join(os.path.dirname(file_path), "save_script.scr")
-            with open(script_path, "w") as f:
-                # 写入SAVEAS命令
-                abs_path = os.path.abspath(file_path)
-                f.write(f'SAVEAS\n"DWG"\n"{abs_path}"\n')
-            
-            # 运行脚本
-            logger.info(f"通过脚本文件保存图纸到: {file_path}")
-            self.doc.SendCommand(f'_SCRIPT\n"{script_path}"\n')
-            
-            # 等待脚本执行完成
-            time.sleep(2)
-            
-            # 删除临时脚本文件
-            try:
-                os.remove(script_path)
-            except:
-                pass
-            
-            logger.info("图纸保存成功")
-            return True
-        except Exception as e:
-            logger.error(f"保存图纸失败: {str(e)}")
-            return False
