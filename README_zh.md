@@ -111,6 +111,8 @@ python src/server.py
 ```
 ![Cursor config](imgs/cursor_config.png)
 
+说明：新版Cursor也改为了json配置，参见上一节
+
 ### MCP Inspector
 
 ```bash
