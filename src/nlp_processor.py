@@ -23,6 +23,8 @@ class NLPProcessor:
         
         self.logger = logging.getLogger(__name__)
         self.logger.info("自然语言处理器已初始化")
+
+        # 对于老版本的CAD不支持设置RGB颜色，所以为了兼容性，按照索引设置颜色
         
         # 详细颜色名称到RGB值的映射
         self.color_rgb_map = {
@@ -40,6 +42,8 @@ class NLPProcessor:
             "棕色": 251,
             "橙色": 30,
             "紫色": 200,
+            "粉色": 221,
+            
 
             # 基本颜色 - 英文键
             "Red": 1,
@@ -54,7 +58,9 @@ class NLPProcessor:
             "Black": 250,
             "Brown": 251,
             "Orange": 30,
-            "Purple": 200
+            "Purple": 200,
+            "Pink": 221,
+                       
         }
         
         # 扩展关键词映射

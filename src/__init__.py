@@ -35,7 +35,7 @@ def load_config():
                 "debug": True
             },
             "cad": {
-                "type": "gstarCAD",
+                "type": "AUTOCAD",
                 "startup_wait_time": 20,
                 "command_delay": 0.5
             },

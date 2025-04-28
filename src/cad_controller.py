@@ -186,29 +186,7 @@ class CADController:
             # 保存文件
             self.doc.SaveAs(file_path)
             logger.info(f"图纸已保存到: {file_path}")
-
-            # # 创建临时脚本文件
-            # script_path = os.path.join(os.path.dirname(file_path), "save_script.scr")
-            # with open(script_path, "w") as f:
-            #     # 写入SAVEAS命令
-            #     abs_path = os.path.abspath(file_path)
-            #     f.write(f'SAVEAS\n"DWG"\n"{abs_path}"\n')
-            
-            # # 运行脚本
-            # logger.info(f"通过脚本文件保存图纸到: {file_path}")
-            # self.doc.SendCommand(f'_SCRIPT\n"{script_path}"\n')
-            
-            # # 等待脚本执行完成
-            # time.sleep(2)
-            
-            # # 删除临时脚本文件
-            # try:
-            #     os.remove(script_path)
-            # except:
-            #     pass
-            
-            # logger.info("图纸保存成功")
-            
+           
             return True
         except Exception as e:
             logger.error(f"保存图纸失败: {str(e)}")
@@ -374,6 +352,60 @@ class CADController:
             return arc
         except Exception as e:
             logger.error(f"绘制圆弧失败: {str(e)}")
+            return None
+ 
+    def draw_ellipse(self, center: Tuple[float, float, float], 
+                    major_axis: float, minor_axis: float, rotation: float = 0, 
+                    layer: str = None, color: int = None, lineweight=None) -> Any:
+        """绘制椭圆"""
+        if not self.is_running():
+            return None
+            
+        try:
+            # 确保点是三维的
+            if len(center) == 2:
+                center = (center[0], center[1], 0)
+            
+            if rotation is None:
+                rotation = 0
+
+            # 将旋转角度转换为弧度
+            rotation_rad = math.radians(rotation)
+            
+            # 使用VARIANT包装坐标点数据
+            center_array = win32com.client.VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, 
+                                               [center[0], center[1], center[2]])
+            
+            # 计算椭圆的主轴向量
+            major_x = major_axis * math.cos(rotation_rad)
+            major_y = major_axis * math.sin(rotation_rad)
+            major_vector = win32com.client.VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, 
+                                               [major_x, major_y, 0])
+            
+            # 添加椭圆
+            ellipse = self.doc.ModelSpace.AddEllipse(center_array, major_vector, minor_axis / major_axis)
+            
+            # 如果指定了图层，设置图层
+            if layer:
+                # 确保图层存在
+                self.create_layer(layer)
+                # 设置实体的图层
+                ellipse.Layer = layer
+            
+            # 如果指定了颜色，设置颜色
+            if color is not None:
+                ellipse.Color = color
+
+            if lineweight is not None:
+                ellipse.LineWeight = self.validate_lineweight(lineweight)
+            
+            # 刷新视图
+            self.refresh_view()
+            
+            logger.debug(f"已绘制椭圆: 中心{center}, 长轴{major_axis}, 短轴{minor_axis}, 旋转角度{rotation}, 图层{layer if layer else '默认'}, 颜色{color if color is not None else '默认'}")
+            return ellipse
+        except Exception as e:
+            logger.error(f"绘制椭圆失败: {str(e)}")
             return None
     
     def draw_polyline(self, points: List[Tuple[float, float, float]], closed: bool = False, layer: str = None, color: int = None, lineweight=None) -> Any:
@@ -627,67 +659,6 @@ class CADController:
         except Exception as e:
             logger.error(f"创建图层时出错: {str(e)}")
             return False
-
-    def create_block(self, block_name: str, insertion_point: Tuple[float, float, float],
-                    entities: List[Any] = None) -> Any:
-        """创建块定义"""
-        if not self.is_running():
-            return None
-        
-        try:
-            # 确保点是三维的
-            if len(insertion_point) == 2:
-                insertion_point = (insertion_point[0], insertion_point[1], 0)
-            
-            # 开始块定义
-            block = self.doc.Blocks.Add(insertion_point, block_name)
-            
-            # 如果提供了实体列表，复制到块中
-            if entities and len(entities) > 0:
-                for entity in entities:
-                    entity_copy = entity.Copy()
-                    block.AddEntity(entity_copy)
-            
-            logger.info(f"已创建块: {block_name}")
-            return block
-        except Exception as e:
-            logger.error(f"创建块时出错: {str(e)}")
-            return None
-
-    def insert_block(self, block_name: str, insertion_point: Tuple[float, float, float],
-                   x_scale: float = 1.0, y_scale: float = 1.0, rotation: float = 0.0, layer: str = None) -> Any:
-            """插入块引用"""
-            if not self.is_running():
-                return None
-            
-            try:
-                # 确保点是三维的
-                if len(insertion_point) == 2:
-                    insertion_point = (insertion_point[0], insertion_point[1], 0)
-                
-                # 转换角度为弧度
-                rotation_rad = math.radians(rotation)
-                
-                # 使用VARIANT包装坐标点数据
-                insertion_array = win32com.client.VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, 
-                                                     [insertion_point[0], insertion_point[1], insertion_point[2]])
-                
-                # 插入块引用
-                block_ref = self.doc.ModelSpace.InsertBlock(insertion_array, block_name, 
-                                                          x_scale, y_scale, 1.0, rotation_rad)
-                
-                # 如果指定了图层，设置图层
-                if layer:
-                    # 确保图层存在
-                    self.create_layer(layer)
-                    # 设置实体的图层
-                    block_ref.Layer = layer
-                
-                logger.info(f"已插入块: {block_name} 在 {insertion_point}, 图层{layer if layer else '默认'}")
-                return block_ref
-            except Exception as e:
-                logger.error(f"插入块时出错: {str(e)}")
-                return None
 
     def add_dimension(self, start_point: Tuple[float, float, float], 
                      end_point: Tuple[float, float, float],

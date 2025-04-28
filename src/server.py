@@ -57,8 +57,8 @@ PROMPT_TEMPLATE = """
 此服务器提供以下基本绘图工具：
 "draw_line": 在CAD中绘制直线
 "draw_circle": 在CAD中绘制圆
-
 "draw_arc": 在CAD中绘制弧
+"draw_ellipse": 在CAD中绘制椭圆
 "draw_polyline": 在CAD中绘制多段线
 "draw_rectangle": 在CAD中绘制矩形
 "draw_text": 在CAD中添加文本
@@ -152,6 +152,7 @@ class CADService:
                 "center": center,
                 "radius": radius,
                 "layer": current_layer,
+                "color": color,
                 "lineweight": lineweight
             })
             self.drawing_state["last_command"] = f"绘制圆，中心点{center}，半径{radius}，图层{current_layer}"
@@ -179,9 +180,38 @@ class CADService:
                 "start_angle": start_angle,
                 "end_angle": end_angle,
                 "layer": current_layer,
+                "color": color,
                 "lineweight": lineweight
             })
             self.drawing_state["last_command"] = f"绘制弧，中心点{center}，半径{radius}，起始角度{start_angle}，结束角度{end_angle}，图层{current_layer}"
+            self.drawing_state["last_result"] = "成功"
+        else:
+            self.drawing_state["last_result"] = "失败"
+        
+        return result
+    
+    def draw_ellipse(self, center, major_axis, minor_axis, rotation=0, layer=None, color=None, lineweight=None):
+        """绘制椭圆"""
+        if not self.controller.is_running():
+            self.start_cad()
+        
+        # 使用当前图层或指定图层
+        current_layer = layer or self.drawing_state["current_layer"]
+        
+        result = self.controller.draw_ellipse(center, major_axis, minor_axis, rotation, current_layer, color, lineweight)
+
+        if result:
+            self.drawing_state["entities"].append({
+                "type": "ellipse",
+                "center": center,
+                "major_axis": major_axis,
+                "minor_axis": minor_axis,
+                "rotation": rotation,
+                "layer": current_layer,
+                "color": color,
+                "lineweight": lineweight
+            })
+            self.drawing_state["last_command"] = f"绘制椭圆，中心点{center}，长轴{major_axis}，短轴{minor_axis}，旋转角度{rotation}，图层{current_layer}"
             self.drawing_state["last_result"] = "成功"
         else:
             self.drawing_state["last_result"] = "失败"
@@ -203,6 +233,7 @@ class CADService:
                 "points": points,
                 "closed": closed,
                 "layer": current_layer,
+                "color": color,
                 "lineweight": lineweight
             })
             self.drawing_state["last_command"] = f"绘制多段线，点集{points}，{'闭合' if closed else '不闭合'}，图层{current_layer}"
@@ -227,6 +258,7 @@ class CADService:
                 "corner1": corner1,
                 "corner2": corner2,
                 "layer": current_layer,
+                "color": color,
                 "lineweight": lineweight
             })
             self.drawing_state["last_command"] = f"绘制矩形，对角点{corner1}和{corner2}，图层{current_layer}"
@@ -252,7 +284,8 @@ class CADService:
                 "text": text,
                 "height": height,
                 "rotation": rotation,
-                "layer": layer or self.drawing_state["current_layer"]
+                "layer": current_layer,
+                "color": color
             })
             self.drawing_state["last_command"] = f"添加文本'{text}'，位置{position}，高度{height}，旋转{rotation}"
             self.drawing_state["last_result"] = "成功"
@@ -397,6 +430,34 @@ class CADService:
                 return {
                     "success": result is not None,
                     "message": "圆弧已绘制" if result else "绘制圆弧失败",
+                    "entity_id": result.Handle if result else None
+                }
+                
+            elif command_type == "draw_ellipse":
+                center = parsed_command.get("center")
+                major_axis = parsed_command.get("major_axis")
+                minor_axis = parsed_command.get("minor_axis")
+                rotation = parsed_command.get("rotation", 0)  # 默认旋转角度为0
+                # 确保所有必要参数都存在且有效
+                if center is None or major_axis is None or minor_axis is None:
+                    return {
+                        "success": False,
+                        "message": "绘制椭圆失败：缺少必要参数",
+                        "error": "缺少必要参数：中心点、长轴或短轴"
+                    }
+                # 获取颜色参数
+                color = parsed_command.get("color")
+                # 尝试从命令中提取颜色名称并转换为RGB值
+                color_rgb = self.nlp_processor.extract_color_from_command(command)
+                if color_rgb is not None:
+                    color = color_rgb  # 优先使用从命令中提取的颜色
+                # 获取线宽参数
+                lineweight = parsed_command.get("lineweight")
+                result = self.draw_ellipse(center, major_axis, minor_axis, rotation, None, color, lineweight)
+
+                return {
+                    "success": result is not None,
+                    "message": "椭圆已绘制" if result else "绘制椭圆失败",
                     "entity_id": result.Handle if result else None
                 }
 
@@ -619,6 +680,30 @@ async def main():
             ),
 
             types.Tool(
+                name="draw_ellipse",
+                description="在CAD中绘制椭圆",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "center": {
+                            "type": "array",
+                            "description": "椭圆中心坐标 [x, y, z]",
+                            "items": {"type": "number"},
+                            "minItems": 2,
+                            "maxItems": 3
+                        },
+                        "major_axis": {"type": "number", "description": "长轴长度"},
+                        "minor_axis": {"type": "number", "description": "短轴长度"},
+                        "rotation": {"type": "number", "description": "旋转角度（度）（可选）"},
+                        "layer": {"type": "string", "description": "图层名称（可选）"},
+                        "color": {"type": "string", "description": "颜色名称（可选）"},
+                        "lineweight": {"type": "number", "description": "线宽（可选）"}
+                    },
+                    "required": ["center", "major_axis", "minor_axis"],
+                },
+            ),
+
+            types.Tool(
                 name="draw_polyline",
                 description="在CAD中绘制多段线",
                 inputSchema={
@@ -777,6 +862,7 @@ async def main():
                 end_point = arguments.get("end_point")
                 layer = arguments.get("layer")
                 color = arguments.get("color") 
+                lineweight = arguments.get("lineweight")
                 
                 # 尝试从命令中提取颜色名称并转换为RGB值
                 color_rgb = cad_service.nlp_processor.extract_color_from_command(color)
@@ -786,7 +872,6 @@ async def main():
                 if not start_point or not end_point:
                     raise ValueError("缺少起点或终点坐标")
                 
-                lineweight = arguments.get("lineweight")
                 
                 result = cad_service.draw_line(start_point, end_point, layer, color, lineweight)
                 return [types.TextContent(type="text", text=str(result))]
@@ -796,6 +881,7 @@ async def main():
                 radius = arguments.get("radius")
                 layer = arguments.get("layer")
                 color = arguments.get("color")
+                lineweight = arguments.get("lineweight")
                 
                 # 尝试从命令中提取颜色名称并转换为RGB值
                 color_rgb = cad_service.nlp_processor.extract_color_from_command(color)
@@ -805,11 +891,9 @@ async def main():
                 if not center or radius is None:
                     raise ValueError("缺少圆心坐标或半径")
                 
-                lineweight = arguments.get("lineweight")
                 
                 result = cad_service.draw_circle(center, radius, layer, color, lineweight)
                 return [types.TextContent(type="text", text=str(result))]
-
 
             elif name == "draw_arc":
                 center = arguments.get("center")
@@ -818,6 +902,7 @@ async def main():
                 end_angle = arguments.get("end_angle")
                 layer = arguments.get("layer")
                 color = arguments.get("color")
+                lineweight = arguments.get("lineweight")
                 
                 # 尝试从命令中提取颜色名称并转换为RGB值
                 color_rgb = cad_service.nlp_processor.extract_color_from_command(color)
@@ -836,11 +921,38 @@ async def main():
                     error_msgs.append("结束角度")
                 
                 if error_msgs:
-                    raise ValueError(f"缺少必要参数: {', '.join(error_msgs)}")
-                
-                lineweight = arguments.get("lineweight")
+                    raise ValueError(f"缺少必要参数: {', '.join(error_msgs)}")                
                 
                 result = cad_service.draw_arc(center, radius, start_angle, end_angle, layer, color, lineweight)
+                return [types.TextContent(type="text", text=str(result))]
+
+            elif name == "draw_ellipse":
+                center = arguments.get("center")
+                major_axis = arguments.get("major_axis")
+                minor_axis = arguments.get("minor_axis")
+                rotation = arguments.get("rotation")
+                layer = arguments.get("layer")
+                color = arguments.get("color")
+                lineweight = arguments.get("lineweight")
+                
+                # 尝试从命令中提取颜色名称并转换为RGB值
+                color_rgb = cad_service.nlp_processor.extract_color_from_command(color)
+                if color_rgb is not None:
+                    color = color_rgb  # 优先使用从命令中提取的颜色
+                
+                # 详细检查每个参数并提供具体的错误信息
+                error_msgs = []
+                if not center:
+                    error_msgs.append("中心点坐标")
+                if major_axis is None:
+                    error_msgs.append("长轴")
+                if minor_axis is None:
+                    error_msgs.append("短轴")
+                
+                if error_msgs:
+                    raise ValueError(f"缺少必要参数: {', '.join(error_msgs)}")
+                
+                result = cad_service.draw_ellipse(center, major_axis, minor_axis, rotation, layer, color, lineweight)
                 return [types.TextContent(type="text", text=str(result))]
 
             elif name == "draw_polyline":
@@ -848,6 +960,7 @@ async def main():
                 closed = arguments.get("closed", False)
                 layer = arguments.get("layer")
                 color = arguments.get("color")
+                lineweight = arguments.get("lineweight")
                 
                 # 尝试从命令中提取颜色名称并转换为RGB值
                 color_rgb = cad_service.nlp_processor.extract_color_from_command(color)
@@ -855,9 +968,7 @@ async def main():
                     color = color_rgb  # 优先使用从命令中提取的颜色
                 
                 if not points or len(points) < 2:
-                    raise ValueError("缺少点集或点数不足")
-                
-                lineweight = arguments.get("lineweight")
+                    raise ValueError("缺少点集或点数不足")                
                 
                 result = cad_service.draw_polyline(points, closed, layer, color, lineweight)
                 return [types.TextContent(type="text", text=str(result))]
@@ -867,6 +978,7 @@ async def main():
                 corner2 = arguments.get("corner2")
                 layer = arguments.get("layer")
                 color = arguments.get("color")
+                lineweight = arguments.get("lineweight")
                 
                 # 尝试从命令中提取颜色名称并转换为RGB值
                 color_rgb = cad_service.nlp_processor.extract_color_from_command(color)
@@ -874,9 +986,7 @@ async def main():
                     color = color_rgb  # 优先使用从命令中提取的颜色
                 
                 if not corner1 or not corner2:
-                    raise ValueError("缺少角点坐标")
-                
-                lineweight = arguments.get("lineweight")
+                    raise ValueError("缺少角点坐标")                
                 
                 result = cad_service.draw_rectangle(corner1, corner2, layer, color, lineweight)
                 return [types.TextContent(type="text", text=str(result))]
