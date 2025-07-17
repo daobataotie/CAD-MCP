@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/daobataotie-cad-mcp-badge.png)](https://mseep.ai/app/daobataotie-cad-mcp)
+
 # CAD-MCP Server (CAD Model Control Protocol Server)
 
 [English](/README_en.md) | [中文](/README_zh.md) 
