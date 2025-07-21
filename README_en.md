@@ -1,4 +1,4 @@
-# CAD-MCP Server (CAD Model Control Protocol Server)
+# CAD-MCP Server (CAD Model Context Protocol Server)
 
 ## Project Introduction
 
