@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# 运行时产物
+*.log
+
+# CAD保存过程的临时产物（SaveAs重试期间产生的save*.tmp）与备份
+*.tmp
+*.bak
+
+# 输出图纸（含测试在仓库根目录落下的dwg）
+output/
+/*.dwg
+
+# 本地手工集成测试（需要真实AutoCAD运行，不随源码分发）
+_integration_test.py
+
+# IDE
+.idea/
+.vscode/
