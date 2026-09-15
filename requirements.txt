@@ -1,5 +1,4 @@
-# CAD MCP 服务依赖
-pywin32>=228
-mcp>=0.1.0
-pydantic>=2.0.0
-typing>=3.7.4.3
+mcp>=1.12,<2       # MCP Python SDK：FastMCP、结构化输出、Streamable HTTP
+pywin32>=306       # Windows COM接口支持
+pydantic>=2.0.0    # 数据校验
+Pillow>=10.0.0     # 截图预览PNG编码

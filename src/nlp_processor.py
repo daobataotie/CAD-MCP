@@ -1,15 +1,16 @@
 import logging
 import re
-import math
 from typing import Any, Dict, List, Optional, Tuple
-import json
 import os
 import os.path
 
-# 直接读取config.json文件
-config_path = os.path.join(os.path.dirname(__file__), 'config.json')
-with open(config_path, 'r', encoding='utf-8') as f:
-    config = json.load(f)
+# 统一使用配置单例（替代各模块重复读取 config.json）
+try:
+    from .config import get_config
+except ImportError:
+    from config import get_config
+
+config = get_config()
 
 logger = logging.getLogger('nlp_processor')
 
@@ -94,10 +95,41 @@ class NLPProcessor:
         }
     
       
+    # 坐标点匹配：(x,y,z) / (x,y) / x,y,z / x,y
+    # 提升为类属性以便复用：解析半径等数字参数前需要先剔除坐标部分，
+    # 否则圆心坐标会被误当作半径
+    _COORD_PATTERN = re.compile(
+        r'\(?\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)(?:\s*,\s*(-?\d+\.?\d*))?\s*\)?')
+
+    def color_to_index(self, color) -> Optional[int]:
+        """将颜色参数（名称或索引）转换为CAD颜色索引(ACI)
+
+        支持中英文颜色名称及1-256的整数索引（256=ByLayer随层）。
+        无法识别时返回None（保持随层颜色）。
+        """
+        if color is None:
+            return None
+        if isinstance(color, int):
+            return color if 1 <= color <= 256 else None
+        if isinstance(color, str):
+            text = color.strip()
+            # 纯数字字符串按索引处理
+            if text.isdigit():
+                num = int(text)
+                return num if 1 <= num <= 256 else None
+            # 先精确匹配颜色名称，再忽略大小写匹配
+            if text in self.color_rgb_map:
+                return self.color_rgb_map[text]
+            lower = text.lower()
+            for name, idx in self.color_rgb_map.items():
+                if name.lower() == lower:
+                    return idx
+        return None
+
     def extract_color_from_command(self, command: str) -> Optional[int]:
-       
+        # 未提供颜色信息时返回None，保持实体的随层(ByLayer)颜色
         if command is None:
-            return 7
+            return None
 
         try:
             num = int(command)
@@ -109,8 +141,8 @@ class NLPProcessor:
         # 将命令转换为小写
         command = command.lower()
         
-        # 尝试匹配颜色名称
-        for color_name in self.color_rgb_map.keys():
+        # 尝试匹配颜色名称（长名称优先，避免"浅灰色"被"灰色"抢先命中）
+        for color_name in sorted(self.color_rgb_map.keys(), key=len, reverse=True):
             if color_name.lower() in command:
                 return self.color_rgb_map[color_name]
         
@@ -123,8 +155,8 @@ class NLPProcessor:
             if color_match in self.color_rgb_map:
                 return self.color_rgb_map[color_match]
                     
-        # 如果找不到颜色信息，返回7 默认白色
-        return 7
+        # 找不到颜色信息时返回None（保持随层颜色，避免覆盖ByLayer语义）
+        return None
     
     def process_command(self, command: str) -> Dict[str, Any]:
         """处理自然语言命令并返回结果"""
@@ -162,6 +194,10 @@ class NLPProcessor:
             return self._parse_draw_text(command)
         elif command_type == "draw_hatch":
             return self._parse_draw_hatch(command)
+        elif command_type == "add_dimension":
+            return self._parse_add_dimension(command)
+        elif command_type == "create_layer":
+            return self._parse_create_layer(command)
         elif command_type == "save":
             return self._parse_save(command)
         else:
@@ -180,6 +216,10 @@ class NLPProcessor:
                 # 基本形状处理
                 for shape, shape_type in self.shape_keywords.items():
                     if shape in command:
+                        # "标注层"中的"标注"是图层名的组成部分（如"创建一个名为标注层的图层"），
+                        # 不能当作标注动作的形状词，否则会误识别为add_dimension
+                        if shape == "标注" and "标注层" in command:
+                            continue
                         if action_type == "draw":
                             if shape_type == "line":
                                 return "draw_line"
@@ -196,13 +236,17 @@ class NLPProcessor:
                             elif shape_type == "dimension":
                                 return "add_dimension"
         
-        # 检查是否是创建图层命令
-        if "图层" in command and any(action in command for action in ["创建", "新建", "添加"]):
+        # 检查是否是创建图层命令（动作词需与_parse_create_layer的识别范围保持一致）
+        if "图层" in command and any(action in command for action in ["创建", "新建", "添加", "建立", "生成"]):
             return "create_layer"
         
         # 检查是否是标注命令
         if "标注" in command:
             return "add_dimension"
+        
+        # 检查是否是填充命令（"填充"动作在动作循环中不会命中draw分支，需单独识别）
+        if "填充" in command:
+            return "draw_hatch"
         
         if "保存" in command:
             return "save"
@@ -212,12 +256,8 @@ class NLPProcessor:
     
     def _extract_coordinates(self, text: str) -> List[Tuple[float, float, float]]:
         """从文本中提取坐标点"""
-        # 匹配坐标格式: (x,y,z) 或 (x,y) 或 x,y,z 或 x,y
-        pattern = r'\(?\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)(?:\s*,\s*(-?\d+\.?\d*))?\s*\)?'
-        matches = re.finditer(pattern, text)
-        
         coordinates = []
-        for match in matches:
+        for match in self._COORD_PATTERN.finditer(text):
             x = float(match.group(1))
             y = float(match.group(2))
             z = float(match.group(3)) if match.group(3) else 0.0
@@ -257,7 +297,8 @@ class NLPProcessor:
         """解析绘制圆命令"""
         # 尝试提取坐标和半径
         coordinates = self._extract_coordinates(command)
-        numbers = self._extract_numbers(command)
+        # 剔除坐标部分再提取数字，避免把圆心坐标误当作半径
+        numbers = self._extract_numbers(self._COORD_PATTERN.sub(' ', command))
         
         # 提取半径
         radius = None
@@ -290,7 +331,8 @@ class NLPProcessor:
         """解析绘制圆弧命令"""
         # 尝试提取坐标、半径和角度
         coordinates = self._extract_coordinates(command)
-        numbers = self._extract_numbers(command)
+        # 剔除坐标部分再提取数字，避免把圆心坐标误当作半径
+        numbers = self._extract_numbers(self._COORD_PATTERN.sub(' ', command))
         
         # 提取中心点
         center = None
@@ -417,7 +459,9 @@ class NLPProcessor:
         coordinates = self._extract_coordinates(command)
         
         # 提取文本内容
-        text_pattern = r'[文本内容|text|内容][：:]\s*[\"\'](.*?)[\"\']'
+        # 注意必须用分组(?:...)而非字符类[...]——字符类会把"文本内容|text|内容"
+        # 拆成单字集合，匹配任意单字加冒号
+        text_pattern = r'(?:文本内容|text|内容)\s*[：:]\s*[\"\'](.*?)[\"\']'
         text_match = re.search(text_pattern, command)
         
         text = ""
@@ -471,7 +515,7 @@ class NLPProcessor:
         # 提取填充图案名称
         pattern_name = "SOLID"  # 默认为实体填充
         pattern_patterns = [
-            r'(?:图案|pattern)[^\w]*?["\'](.*?)["\']\'',
+            r'(?:图案|pattern)[^\w]*?["\'](.*?)["\']',
             r'(?:图案|pattern)[^\w]*?(\w+)'
         ]
         
@@ -505,6 +549,52 @@ class NLPProcessor:
                 "message": "绘制填充需要至少3个点来定义边界"
             }
 
+
+    def _parse_add_dimension(self, command: str) -> Dict[str, Any]:
+        """解析添加线性标注命令（取前两个坐标点作为标注起止点）"""
+        coordinates = self._extract_coordinates(command)
+        if len(coordinates) < 2:
+            return {
+                "type": "error",
+                "message": "添加标注需要两个坐标点（起点和终点）"
+            }
+        return {
+            "type": "add_dimension",
+            "start_point": coordinates[0],
+            "end_point": coordinates[1]
+        }
+
+    def _parse_create_layer(self, command: str) -> Dict[str, Any]:
+        """解析创建图层命令
+
+        兼容多种语序："名为WALL的图层"、"创建WALL图层"、"创建图层WALL"、
+        引号形式 "创建图层'墙体'"
+        """
+        # 优先提取引号中的图层名称
+        quote_match = re.search(r'["\'](.*?)["\']', command)
+        if quote_match:
+            return {"type": "create_layer", "layer_name": quote_match.group(1)}
+
+        # "名为/叫做/名称为 X"——名称在关键字之后（如"创建一个名为WALL的图层"）
+        # 捕获组必须非贪婪并终止于"的/图层"之前，
+        # 否则贪婪匹配会把"WALL的图层"整体误当作图层名
+        # （"的"与"图层"之间允许一个"新"字："叫做结构层的新图层"）
+        m = re.search(r'(?:名为|叫做|名称为|命名为)\s*([\w\u4e00-\u9fa5-]+?)(?=\s*(?:的)?(?:新)?图层|\s*$)', command)
+        if m:
+            return {"type": "create_layer", "layer_name": m.group(1)}
+
+        # "X图层"——名称直接位于"图层"之前（如"创建墙体图层"）
+        m = re.search(r'(?:创建|新建|添加|建立|生成)\s*(?:一个|一个新|新的)?\s*([\w\u4e00-\u9fa5-]+)\s*(?:的)?\s*(?:新)?图层', command)
+        if m:
+            return {"type": "create_layer", "layer_name": m.group(1)}
+
+        # "图层X"——名称位于"图层"之后（如"创建图层WALL"）
+        m = re.search(r'图层\s*(?:名为|叫做|名称为|:|：)?\s*([\w\u4e00-\u9fa5-]+)', command)
+        if m:
+            return {"type": "create_layer", "layer_name": m.group(1)}
+
+        # 未识别出图层名称
+        return {"type": "create_layer", "layer_name": None}
 
     def _parse_save(self, command: str) -> Dict[str, Any]:
         """解析保存命令"""

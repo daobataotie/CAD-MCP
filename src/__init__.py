@@ -2,51 +2,24 @@
 CAD MCP 服务包
 """
 
-import os
-import json
 import logging
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# 注意：此处绝不能调用 logging.basicConfig——
+# 包方式运行（cad-mcp入口导入src.server）时本模块先于server.py执行，
+# basicConfig会抢先给root logger装上默认StreamHandler，
+# 导致server.py中的日志配置（含FileHandler）被静默忽略
+# （basicConfig在root已有handler时不生效），cad_mcp.log将永远为空。
+# 日志配置统一由 server.py 入口完成。
 
 logger = logging.getLogger('cad_mcp')
 
-# 加载配置
-def load_config():
-    """加载配置文件"""
-    config_path = os.path.join(os.path.dirname(__file__), 'config.json')
-    try:
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        logger.info("配置文件加载成功")
-        return config
-    except Exception as e:
-        logger.error(f"加载配置文件失败: {str(e)}")
-        # 返回默认配置
-        return {
-            "server": {
-                "name": "CAD MCP Server",
-                "version": "1.0.0",
-                "host": "0.0.0.0",
-                "port": 5000,
-                "debug": True
-            },
-            "cad": {
-                "type": "AUTOCAD",
-                "startup_wait_time": 20,
-                "command_delay": 0.5
-            },
-            "output": {
-                "directory": "output",
-                "default_filename": "cad_drawing.dwg"
-            }
-        }
-
-# 导出配置
-config = load_config()
+# 统一使用 config.py 的配置单例（含加载失败时的默认配置兜底）
+try:
+    from .config import get_config
+    config = get_config()
+except ImportError:
+    from config import get_config
+    config = get_config()
 
 __all__ = [
     'config'
