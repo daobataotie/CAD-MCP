@@ -1,6 +1,6 @@
 # CAD-MCP Server (CAD Model Context Protocol Server)
 
-[English](/README_en.md) | [中文](/README_zh.md) 
+[English](/README_en.md) | [中文](/README_zh.md) | [ไทย](/README_th.md)
 
 ## Project Introduction
 
