@@ -94,6 +94,59 @@ def _call_with_com_retry(fn, args, kwargs, retries: int = 20, delay: float = 0.5
     raise RuntimeError("unreachable")  # 逻辑上不可达，仅为类型完整
 
 
+def _print_window(hwnd):
+    """用PrintWindow截取窗口（无需前台、不受遮挡），失败或全黑返回None"""
+    import ctypes
+    import win32gui
+    import win32ui
+    from PIL import Image
+
+    user32 = ctypes.windll.user32
+    # 线程级感知DPI：否则缩放屏上GetWindowRect返回逻辑坐标，位图尺寸不对
+    old_ctx = None
+    try:
+        user32.SetThreadDpiAwarenessContext.restype = ctypes.c_void_p
+        old_ctx = user32.SetThreadDpiAwarenessContext(ctypes.c_void_p(-4))  # PER_MONITOR_AWARE_V2
+    except Exception:
+        pass
+    hwnd_dc = mfc_dc = save_dc = bmp = None
+    try:
+        left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+        w, h = right - left, bottom - top
+        if w <= 0 or h <= 0:
+            return None
+        hwnd_dc = win32gui.GetWindowDC(hwnd)
+        mfc_dc = win32ui.CreateDCFromHandle(hwnd_dc)
+        save_dc = mfc_dc.CreateCompatibleDC()
+        bmp = win32ui.CreateBitmap()
+        bmp.CreateCompatibleBitmap(mfc_dc, w, h)
+        save_dc.SelectObject(bmp)
+        # 2 = PW_RENDERFULLCONTENT，含DirectX绘制的图形区
+        if not user32.PrintWindow(hwnd, save_dc.GetSafeHdc(), 2):
+            return None
+        info = bmp.GetInfo()
+        img = Image.frombuffer("RGB", (info["bmWidth"], info["bmHeight"]),
+                               bmp.GetBitmapBits(True), "raw", "BGRX", 0, 1)
+        # 全黑说明窗口没有真正绘制，交给屏幕截取
+        if img.convert("L").getextrema()[1] == 0:
+            return None
+        return img
+    finally:
+        if bmp is not None:
+            win32gui.DeleteObject(bmp.GetHandle())
+        if save_dc is not None:
+            save_dc.DeleteDC()
+        if mfc_dc is not None:
+            mfc_dc.DeleteDC()
+        if hwnd_dc is not None:
+            win32gui.ReleaseDC(hwnd, hwnd_dc)
+        if old_ctx:
+            try:
+                user32.SetThreadDpiAwarenessContext(ctypes.c_void_p(old_ctx))
+            except Exception:
+                pass
+
+
 class COMExecutor:
     """专用COM线程执行器
 
@@ -1081,16 +1134,25 @@ class CADController:
         if win32gui.IsIconic(hwnd):
             win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
             time.sleep(0.3)
-        # 尽量把CAD窗口带到前台，避免被其他窗口遮挡
+        # 优先用PrintWindow让CAD把自己的窗口画进位图：不依赖前台，
+        # 被其他窗口遮挡也能截到。Windows会拒绝后台进程的SetForegroundWindow
+        # 且不报错，屏幕截取因此截到挡在前面的窗口
+        img = None
         try:
-            win32gui.SetForegroundWindow(hwnd)
-            time.sleep(0.3)
+            img = _print_window(hwnd)
         except Exception as e:
-            logger.warning(f"无法将CAD窗口置前（仍会尝试截图）: {str(e)}")
+            logger.warning(f"PrintWindow截图失败，改用屏幕截取: {str(e)}")
 
-        left, top, right, bottom = win32gui.GetWindowRect(hwnd)
-        # all_screens=True 以支持多显示器/负坐标场景
-        img = ImageGrab.grab(bbox=(left, top, right, bottom), all_screens=True)
+        if img is None:
+            # 退路：尽量把CAD窗口带到前台，再截屏幕区域
+            try:
+                win32gui.SetForegroundWindow(hwnd)
+                time.sleep(0.3)
+            except Exception as e:
+                logger.warning(f"无法将CAD窗口置前（仍会尝试截图）: {str(e)}")
+            left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+            # all_screens=True 以支持多显示器/负坐标场景
+            img = ImageGrab.grab(bbox=(left, top, right, bottom), all_screens=True)
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         return buf.getvalue()
