@@ -221,6 +221,8 @@ class CADController:
         self.command_delay = config["cad"]["command_delay"]
         # 获取CAD类型
         self.cad_type = config["cad"]["type"]
+        # 最近一次连接失败的原因（ProgID、HRESULT等），供上层提示用户排查
+        self.last_connect_error = ""
         # 有效的线宽值列表
         self.valid_lineweights = [0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100, 106, 120, 140, 158, 200, 211]
         logger.info("CAD控制器已初始化")
@@ -231,6 +233,13 @@ class CADController:
         注意：COM 的 ProgID 查找不区分大小写，GCAD.Application 与 Gcad.Application 等价。
         同一CAD不同年代版本注册的ProgID可能不同（如浩辰有GCAD/GstarCAD两种），
         返回候选列表由 start_cad 依次尝试，避免目标机器只注册了另一种时连不上。
+
+        AutoCAD 的 ProgID 是按版本族硬绑定的：每个 ProgID 对应各自的 CLSID，
+        GetActiveObject 走的是"ProgID → CLSID → 运行对象表"，所以不带版本的
+        AutoCAD.Application 只能连上 CurVer 指向的那一族。机器上装了多个版本、
+        或用户运行的版本不是 CurVer 那一族时，连接会直接失败（表现为"CAD未运行"）。
+        候选顺序：config.json 里显式指定的 progid → 注册表发现的版本化 ProgID（版本倒序）
+        → 通用名兜底。
         """
         # 各CAD软件的COM ProgID映射（未匹配的类型回退到AutoCAD）
         app_map = {
@@ -239,7 +248,74 @@ class CADController:
             "gstarcad": (["GCAD.Application", "GstarCAD.Application"], "浩辰CAD"),
             "zwcad": (["ZWCAD.Application"], "中望CAD"),
         }
-        return app_map.get(self.cad_type.lower(), (["AutoCAD.Application"], "AutoCAD"))
+        base_ids, app_name = app_map.get(self.cad_type.lower(),
+                                        (["AutoCAD.Application"], "AutoCAD"))
+
+        candidates: List[str] = []
+        # 1) 用户显式指定的 ProgID 优先
+        custom = str((config.get("cad") or {}).get("progid") or "").strip()
+        if custom:
+            candidates.append(custom)
+        # 2) 注册表里发现的版本化 ProgID（只有AutoCAD有版本族概念）
+        if self.cad_type.lower() == "autocad":
+            candidates.extend(self._discover_autocad_progids())
+        # 3) 通用名兜底
+        candidates.extend(base_ids)
+
+        seen = set()
+        unique: List[str] = []
+        for prog_id in candidates:
+            if prog_id and prog_id not in seen:
+                seen.add(prog_id)
+                unique.append(prog_id)
+        return unique, app_name
+
+    @staticmethod
+    def _discover_autocad_progids() -> List[str]:
+        """扫描注册表找出版本化的AutoCAD ProgID（AutoCAD.Application.25.1 等），版本号倒序
+
+        装了多个AutoCAD版本时，版本化ProgID是唯一能确定连到哪个版本的方式。
+        """
+        prefix = "AutoCAD.Application."
+        found: List[str] = []
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, "") as root:
+                index = 0
+                while True:
+                    try:
+                        name = winreg.EnumKey(root, index)
+                        index += 1
+                    except OSError:
+                        break
+                    if name.startswith(prefix):
+                        found.append(name)
+        except Exception as e:
+            logger.warning(f"扫描AutoCAD版本化ProgID失败: {str(e)}")
+            return []
+
+        def version_key(name: str) -> tuple:
+            try:
+                return tuple(int(x) for x in name[len(prefix):].split("."))
+            except ValueError:
+                return ()
+
+        return sorted(found, key=version_key, reverse=True)
+
+    @staticmethod
+    def _com_error_text(e) -> str:
+        """提取COM异常的可读信息（HRESULT + 描述），便于用户排查连接失败的原因"""
+        parts: List[str] = []
+        hresult = getattr(e, "hresult", None)
+        if hresult is not None:
+            parts.append(f"HRESULT 0x{hresult & 0xFFFFFFFF:08X}")
+        info = tuple(getattr(e, "excepinfo", None) or ())
+        # excepinfo: (argError, scode, source, description, helpfile, helpContext, helpFile)
+        if len(info) > 3 and info[3]:
+            parts.append(str(info[3]))
+        if not parts:
+            return str(e)
+        return " ".join(parts)
 
     def start_cad(self) -> bool:
         """启动CAD并创建或打开一个文档"""
@@ -255,6 +331,8 @@ class CADController:
             pythoncom.CoInitialize()
 
             app_ids, app_name = self._get_app_info()
+            logger.info(f"{app_name}候选ProgID: {app_ids}")
+            failures: List[str] = []
 
             # 第一步：尝试连接已运行的实例（遍历候选ProgID）
             for app_id in app_ids:
@@ -265,6 +343,7 @@ class CADController:
                     break
                 except Exception as e:
                     logger.info(f"未找到运行中的{app_name}实例（{app_id}），继续尝试: {str(e)}")
+                    failures.append(f"{app_id}: {self._com_error_text(e)}")
 
             # 第二步：连接失败则启动新实例（同样遍历候选ProgID）
             if self.app is None:
@@ -276,6 +355,7 @@ class CADController:
                         break
                     except Exception as e:
                         logger.info(f"启动{app_name}实例失败（{app_id}），继续尝试: {str(e)}")
+                        failures.append(f"{app_id}: {self._com_error_text(e)}")
                 if self.app is None:
                     raise Exception(f"无法连接或启动{app_name}（候选ProgID: {app_ids}）")
                 # 等待CAD启动
@@ -317,6 +397,13 @@ class CADController:
 
         except Exception as e:
             logger.error(f"启动CAD失败: {str(e)}")
+            # 记录失败原因，供上层提示用户排查（原来所有失败都只显示"CAD未运行"）
+            detail = str(e)
+            if failures:
+                # 同一个ProgID连接/启动各失败一次，去重后只留一条
+                unique_failures = list(dict.fromkeys(failures))
+                detail = f"{detail}；各ProgID尝试结果: {'; '.join(unique_failures)}"
+            self.last_connect_error = detail
             return False
         finally:
             # 清理旧实例

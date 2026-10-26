@@ -8,6 +8,7 @@
     },
     "cad": {
         "type": "AUTOCAD",
+        "progid": "",
         "startup_wait_time": 20,
         "command_delay": 0.5
     },
