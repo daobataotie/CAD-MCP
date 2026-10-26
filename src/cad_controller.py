@@ -102,6 +102,15 @@ def _print_window(hwnd):
     from PIL import Image
 
     user32 = ctypes.windll.user32
+    # 显式声明 PrintWindow 的参数类型：ctypes 默认把 Python int 当 32 位 C int 传，
+    # 句柄值超过 2^31-1 会抛 OverflowError，而该异常会被上层 except 吞掉并
+    # 静默退回旧的屏幕截取（正好是这个函数要规避的行为）。
+    try:
+        from ctypes import wintypes
+        user32.PrintWindow.argtypes = [wintypes.HWND, wintypes.HDC, wintypes.UINT]
+        user32.PrintWindow.restype = wintypes.BOOL
+    except Exception:
+        pass
     # 线程级感知DPI：否则缩放屏上GetWindowRect返回逻辑坐标，位图尺寸不对
     old_ctx = None
     try:
