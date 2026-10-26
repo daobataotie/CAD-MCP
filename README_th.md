@@ -103,7 +103,7 @@ Pillow>=10.0.0     # เข้ารหัส PNG สำหรับภาพต
   - `host` / `port`: ที่อยู่และพอร์ตที่รอรับการเชื่อมต่อในโหมด Streamable HTTP (เขียนทับได้ด้วยอาร์กิวเมนต์ `--host` / `--port` ทางบรรทัดคำสั่ง)
 - **cad**: 
   - `type`: ประเภทโปรแกรม CAD (AutoCAD, GCAD, GstarCAD หรือ ZWCAD)
-- `progid`: ระบุ COM ProgID ที่ใช้ เช่น `AutoCAD.Application.25.1` เว้นว่างไว้เพื่อให้ระบบตรวจหาอัตโนมัติ (ค้นหา ProgID ที่มีเลขเวอร์ชันจาก registry)
+  - `progid`: ระบุ COM ProgID ที่ใช้ เช่น `AutoCAD.Application.25.1` เว้นว่างไว้เพื่อให้ระบบตรวจหาอัตโนมัติ (ค้นหา ProgID ที่มีเลขเวอร์ชันจาก registry)
   - `startup_wait_time`: เวลารอให้ CAD เปิดเสร็จ (วินาที)
   - `command_delay`: เวลาหน่วงระหว่างการรันคำสั่ง (วินาที)
 - **output**: การตั้งค่าไฟล์เอาต์พุต

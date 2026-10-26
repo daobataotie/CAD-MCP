@@ -103,7 +103,7 @@ Pillow>=10.0.0     # 截图预览PNG编码
   - `host` / `port`: Streamable HTTP 模式的监听地址和端口（也可通过命令行 `--host` / `--port` 覆盖）
 - **cad**: 
   - `type`: CAD软件类型（AutoCAD、GCAD、GstarCAD或ZWCAD）
-- `progid`: 指定要使用的 COM ProgID，例如 `AutoCAD.Application.25.1`。留空则自动探测（从注册表查找版本化 ProgID）
+  - `progid`: 指定要使用的 COM ProgID，例如 `AutoCAD.Application.25.1`。留空则自动探测（从注册表查找版本化 ProgID）
   - `startup_wait_time`: CAD启动等待时间（秒）
   - `command_delay`: 命令执行延迟（秒）
 - **output**: 输出文件设置

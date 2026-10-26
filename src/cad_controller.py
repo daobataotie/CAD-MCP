@@ -310,7 +310,7 @@ class CADController:
         if hresult is not None:
             parts.append(f"HRESULT 0x{hresult & 0xFFFFFFFF:08X}")
         info = tuple(getattr(e, "excepinfo", None) or ())
-        # excepinfo: (argError, scode, source, description, helpfile, helpContext, helpFile)
+        # excepinfo: (wCode, wReserved, source, description, helpFile, helpContext, scode)
         if len(info) > 3 and info[3]:
             parts.append(str(info[3]))
         if not parts:
@@ -326,13 +326,13 @@ class CADController:
             self.app = None
             self.doc = None
 
+        failures: List[str] = []
         try:
             # 初始化COM（若已在COM线程上则幂等）
             pythoncom.CoInitialize()
 
             app_ids, app_name = self._get_app_info()
             logger.info(f"{app_name}候选ProgID: {app_ids}")
-            failures: List[str] = []
 
             # 第一步：尝试连接已运行的实例（遍历候选ProgID）
             for app_id in app_ids:

@@ -103,7 +103,7 @@ The configuration file is located at `src/config.json` and contains the followin
   - `host` / `port`: Listen address and port for Streamable HTTP mode (can also be overridden via `--host` / `--port` command-line arguments)
 - **cad**: 
   - `type`: CAD software type (AutoCAD, GCAD, GstarCAD, or ZWCAD)
-- `progid`: COM ProgID to use, e.g. `AutoCAD.Application.25.1`. Leave empty to auto-detect (versioned ProgIDs are looked up in the registry)
+  - `progid`: COM ProgID to use, e.g. `AutoCAD.Application.25.1`. Leave empty to auto-detect (versioned ProgIDs are looked up in the registry)
   - `startup_wait_time`: CAD startup waiting time (seconds)
   - `command_delay`: Command execution delay (seconds)
 - **output**: Output file settings
