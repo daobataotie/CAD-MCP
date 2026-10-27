@@ -214,7 +214,11 @@ class NLPProcessor:
         for action, action_type in self.action_keywords.items():
             if action in command:
                 # 基本形状处理
-                for shape, shape_type in self.shape_keywords.items():
+                # 形状词必须按长度降序匹配（长词优先）：否则子串匹配会让"圆"
+                # 抢先命中"圆弧"，把"画一段圆弧"误识别为画圆
+                # （与 extract_color_from_command 中"浅灰色优先于灰色"同理）
+                for shape, shape_type in sorted(self.shape_keywords.items(),
+                                                key=lambda kv: len(kv[0]), reverse=True):
                     if shape in command:
                         # "标注层"中的"标注"是图层名的组成部分（如"创建一个名为标注层的图层"），
                         # 不能当作标注动作的形状词，否则会误识别为add_dimension

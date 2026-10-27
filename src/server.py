@@ -32,10 +32,17 @@ from mcp.types import ToolAnnotations, ImageContent, TextContent
 from logging.handlers import RotatingFileHandler
 
 # 配置Windows环境下的UTF-8编码
+# 注意：IDLE 等嵌入式解释器会把 sys.stdin/stdout/stderr 换成 io.TextIOBase 子类
+# （如 idlelib.run.StdInputFile），这类对象没有 reconfigure()，直接调用会抛
+# AttributeError 让服务器根本起不来，所以先做能力检测再设置。
 if sys.platform == "win32" and os.environ.get('PYTHONIOENCODING') is None:
-    sys.stdin.reconfigure(encoding="utf-8")
-    sys.stdout.reconfigure(encoding="utf-8")
-    sys.stderr.reconfigure(encoding="utf-8")
+    for _stream in (sys.stdin, sys.stdout, sys.stderr):
+        _reconfigure = getattr(_stream, "reconfigure", None)
+        if _reconfigure is not None:
+            try:
+                _reconfigure(encoding="utf-8")
+            except Exception:  # 个别流不支持切换编码时忽略，不能因此启动失败
+                pass
 
 config = get_config()
 
@@ -1120,6 +1127,26 @@ def cad_assistant() -> str:
 
 # ==================== 主入口 ====================
 
+def _stdio_channel_problem():
+    """返回 stdio 通道不可用的原因；正常由客户端拉起时返回 None
+
+    MCP 的 stdio 传输要求 stdin/stdout 是客户端拉起的真实管道。
+    在 IDLE 里按 F5、或在终端里手动跑，stdout 都不是管道，客户端根本连不上，
+    这时给出一句能看懂的提示，避免用户对着"没反应"猜。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.fileno()
+        except Exception:
+            return "当前 stdout/stderr 不是真实管道（可能是在 IDLE 等嵌入式解释器里直接运行）"
+    try:
+        if sys.stdout.isatty():
+            return "当前 stdout 是终端窗口（MCP 客户端需要用管道跟本进程通信）"
+    except Exception:
+        pass
+    return None
+
+
 def main():
     """主入口：支持 stdio（默认）与 streamable-http 两种传输方式"""
     parser = argparse.ArgumentParser(description="CAD MCP 服务器")
@@ -1142,6 +1169,10 @@ def main():
         mcp.run(transport="streamable-http")
     else:
         logger.info("服务器以 stdio 传输运行")
+        problem = _stdio_channel_problem()
+        if problem:
+            logger.warning(f"提示：{problem}，MCP 客户端无法连上本进程；"
+                           "请让客户端按配置自动拉起本进程，或改用 --transport streamable-http")
         mcp.run()  # 默认 stdio
 
 
